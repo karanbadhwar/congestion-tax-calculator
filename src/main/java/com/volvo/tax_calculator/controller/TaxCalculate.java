@@ -58,9 +58,12 @@ public class TaxCalculate {
         }
 
         //Checking if the Vehicle is already in the records or not
+        //TODO why do you need vehicle entity?
         VehicleEntity currentVehicle = vehicleService.getVehicleInfo(vehicle.getVehicleNumber(), vehicle.getVehicleType());
 //        int currentHourTax = taxCalculatorService.taxCalculationCurrentHour();
+        //TODO: If it's just calculating hour tax why is the function named as calculateTax
         int currentHourTax = congestionTaxCalculator.calculateTax(LocalDateTime.now());
+        //TODO: can we use this if check so we don't need to call the calculate tax?
         if(currentVehicle.getTaxList().isEmpty()) {
             taxCalculatorService.updatingTax(currentHourTax, vehicle);
             return new ResponseEntity<>(currentHourTax, HttpStatus.OK);
