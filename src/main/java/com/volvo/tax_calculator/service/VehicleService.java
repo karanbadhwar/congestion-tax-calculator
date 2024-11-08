@@ -10,6 +10,7 @@ import java.util.Optional;
 
 @Slf4j
 @Service
+//TODO: Use allArgsConstructor
 public class VehicleService {
 
     @Autowired
@@ -17,6 +18,7 @@ public class VehicleService {
 
     public void saveVehicle(VehicleEntity vehicle) {
         try{
+            //TODO There is no check for vehicle, this is not required
             vehicleRepository.save(vehicle);
         }catch(Exception e) {
             log.error(e.getMessage());

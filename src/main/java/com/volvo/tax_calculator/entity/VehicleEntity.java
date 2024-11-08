@@ -18,13 +18,16 @@ import java.util.List;
 public class VehicleEntity {
 
     @Id
+    //TODO what is object ID and why not use String or Integer instead of this
     private ObjectId id;
 
     @NonNull
+    //Are you using the results of NonNull?
     private String vehicleType;
 
     @NonNull
     @Indexed(unique = true)
+    //When inserting in the db does this need to be unique? Can a single car not have multiple instances?
     private String vehicleNumber;
 
     @DBRef

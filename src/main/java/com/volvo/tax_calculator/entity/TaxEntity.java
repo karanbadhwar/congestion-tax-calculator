@@ -1,3 +1,4 @@
+//TODO package name should be entities
 package com.volvo.tax_calculator.entity;
 
 import lombok.AllArgsConstructor;

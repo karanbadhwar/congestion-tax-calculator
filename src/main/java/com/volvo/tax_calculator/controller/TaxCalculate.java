@@ -22,6 +22,7 @@ import static com.volvo.tax_calculator.constants.ExemptVehicleType.isExempted;
 @RequestMapping("api/tax-calculator")
 public class TaxCalculate {
 
+    //TODO use AllArgsConstructor
     @Autowired
     private taxCalculatorService taxCalculatorService;
 
@@ -41,9 +42,13 @@ public class TaxCalculate {
 
     @PostMapping
     public ResponseEntity<Integer> taxCalculation(@RequestBody VehicleEntity vehicle) {
+        //TODO where are the validations before getting the vehicleType?
         String vehicleType = vehicle.getVehicleType();
         //Checking for the exempted list of vehicles
         if(isExempted(vehicleType)) {
+            //TODO: This is repeated twice, you should not repeat the code
+            //Why are we returning integer, should we not return the object so we can send more things in the future?
+            //How do you want to send the errors to the user?
             return new ResponseEntity<>(0, HttpStatus.OK);
         }
 

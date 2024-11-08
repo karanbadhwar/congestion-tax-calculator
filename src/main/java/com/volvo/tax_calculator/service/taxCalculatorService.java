@@ -26,6 +26,7 @@ import java.util.Optional;
 
 @Slf4j
 @Service
+//TODO class name should start with upper case
 public class taxCalculatorService {
 
     @Autowired
@@ -43,14 +44,23 @@ public class taxCalculatorService {
         //checking if the current month is July and weekends
         Month currentMonth = dateTime.getMonth();
         //Checking for the Month of July(
+        //TODO: Why are there unnecessary brackets?
         boolean isJuly = (currentMonth == Month.JULY);
+        //TODO if one of the condition is true why do you need to check the next condition?
+//        if (currentMonth == Month.JULY) {
+//            return true;
+//        }
 
         //Checking if today is a national holiday
+        //TODO: Why are you doing this always?
+        // TODO: Can't this be done once in the post construct or constructor and then used again?
         List<String> holidayList = Arrays.asList(holidays.split(","));
+        //TODO: Why not a set? Why is it a list?
         boolean isHoliday = holidayList.contains(currentDate);
 
         //Checking if current day is a Weekend or not
         DayOfWeek currentDay = dateTime.getDayOfWeek();
+
         boolean isWeekend = (currentDay == DayOfWeek.SATURDAY || currentDay == DayOfWeek.SUNDAY);
 
         log.debug("Current month: {}, Current day: {}, isJuly: {}, isWeekend: {}", currentMonth, currentDay, isJuly, isWeekend);
