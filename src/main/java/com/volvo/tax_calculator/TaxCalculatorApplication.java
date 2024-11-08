@@ -10,6 +10,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 @SpringBootApplication
 public class TaxCalculatorApplication {
 
+	//TODO you're using maven but pom.xml is not added to the project
 	public static void main(String[] args) {
 		SpringApplication.run(TaxCalculatorApplication.class, args);
 	}

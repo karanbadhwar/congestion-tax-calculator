@@ -12,6 +12,7 @@ public class CongestionTaxCalculator {
 
     // Enum for Tax Brackets
     private enum TaxBracket {
+        //TODO this is bad, like really really bad. Use rangeMap instead or LinkedHashMap with startTime and endTime
         MORNING_06_00_TO_06_29(6, 0, 6, 29, 8),
         MORNING_06_30_TO_06_59(6, 30, 6, 59, 13),
         MORNING_07_00_TO_07_59(7, 0, 7, 59, 18),
@@ -44,6 +45,7 @@ public class CongestionTaxCalculator {
         }
 
         private static boolean isBetween(int hour, int minute, int startHour, int startMinute, int endHour, int endMinute) {
+            //TODO the year was mentioned in the question as a sample, the year can change everytime
             LocalDateTime current = LocalDateTime.of(2013, 1, 1, hour, minute);
             LocalDateTime start = LocalDateTime.of(2013, 1, 1, startHour, startMinute);
             LocalDateTime end = LocalDateTime.of(2013, 1, 1, endHour, endMinute);
@@ -56,6 +58,8 @@ public class CongestionTaxCalculator {
         log.info("Calculating congestion tax for date/time: {}", dateTime);
 
         // Iterate through all tax brackets and check if the date/time falls within one of the brackets
+        //TODO: why did you even create the enum if you're going to use it as a list?
+        //Can you do this operation in O(1)
         for (TaxBracket bracket : TaxBracket.values()) {
             if (bracket.isInRange(dateTime)) {
                 log.debug("Tax bracket matched: {}", bracket);

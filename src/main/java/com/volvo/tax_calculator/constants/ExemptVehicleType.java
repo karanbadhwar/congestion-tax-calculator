@@ -12,6 +12,7 @@ public enum ExemptVehicleType  {
     FOREIGN;
 
     public static boolean isExempted(String vehicleType) {
+        //TODO What happens if vehicleType is null
         try {
           ExemptVehicleType type = ExemptVehicleType.valueOf(vehicleType.toUpperCase());
           return true;

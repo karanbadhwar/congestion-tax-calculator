@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("api/vehicle")
+//TODO: Why does a service which takes care of tax calculation taking care of storing vehicles as well?
 public class VehicleController {
 
     @Autowired
