@@ -1,7 +1,8 @@
 package com.volvo.tax_calculator.service;
 
-import com.volvo.tax_calculator.entity.VehicleEntity;
+import com.volvo.tax_calculator.entities.VehicleEntity;
 import com.volvo.tax_calculator.repository.VehicleRepository;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -10,10 +11,10 @@ import java.util.Optional;
 
 @Slf4j
 @Service
+@AllArgsConstructor
 public class VehicleService {
 
-    @Autowired
-    private VehicleRepository vehicleRepository;
+    private final VehicleRepository vehicleRepository;
 
     public void saveVehicle(VehicleEntity vehicle) {
         try{

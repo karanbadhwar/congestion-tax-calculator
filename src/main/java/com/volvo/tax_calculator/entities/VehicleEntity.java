@@ -1,4 +1,4 @@
-package com.volvo.tax_calculator.entity;
+package com.volvo.tax_calculator.entities;
 
 import lombok.*;
 import org.bson.types.ObjectId;

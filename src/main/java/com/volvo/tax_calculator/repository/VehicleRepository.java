@@ -1,6 +1,6 @@
 package com.volvo.tax_calculator.repository;
 
-import com.volvo.tax_calculator.entity.VehicleEntity;
+import com.volvo.tax_calculator.entities.VehicleEntity;
 import org.bson.types.ObjectId;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
