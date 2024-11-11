@@ -8,6 +8,7 @@ import com.volvo.tax_calculator.service.TaxCalculatorService;
 import com.volvo.tax_calculator.service.VehicleService;
 import com.volvo.tax_calculator.utils.CongestionTaxCalculator;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,7 @@ import java.util.List;
 
 import static com.volvo.tax_calculator.constants.ExemptVehicleType.isExempted;
 
+@Slf4j
 @RestController
 @RequestMapping("api/tax-calculator")
 @AllArgsConstructor
@@ -45,6 +47,10 @@ public class TaxCalculate {
     }
 
     public ResponseDto<Integer> calculateTaxForVehicle(VehicleEntity vehicle) {
+        if (vehicle == null) {
+            log.error("Vehicle entity is null");
+            return new ResponseDto<>(HttpStatus.BAD_REQUEST, "Vehicle data is missing", 0);
+        }
         String vehicleType = vehicle.getVehicleType();
 
         if (isExempted(vehicleType)) {
