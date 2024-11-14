@@ -1,44 +1,32 @@
 package com.volvo.tax_calculator.service;
-
+import com.mongodb.MongoWriteException;
 import com.volvo.tax_calculator.entities.TaxEntity;
-import com.volvo.tax_calculator.entities.VehicleEntity;
 import com.volvo.tax_calculator.repository.TaxRepository;
-import com.volvo.tax_calculator.repository.VehicleRepository;
-
 import jakarta.annotation.PostConstruct;
-import jakarta.persistence.EntityNotFoundException;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.core.env.Environment;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.DayOfWeek;
-
 import java.time.LocalDateTime;
 import java.time.Month;
-
 import java.util.*;
 
 @Slf4j
 @Service
+@AllArgsConstructor
 public class TaxCalculatorService {
 
-    @Autowired
-    private VehicleRepository vehicleRepository;
-
-    @Autowired
-    private TaxRepository taxRepository;
-
-    @Value("${holidays}")  // Load the holidays from application.properties
-    private String holidays;
+    private final TaxRepository taxRepository;
+    private final Environment environment;
 
     private Set<String> holidaySet;
 
     @PostConstruct
     public void init() {
+        String holidays = environment.getProperty("holidays");
         holidaySet = new HashSet<>(Arrays.asList(holidays.split(",")));
     }
 
@@ -54,17 +42,32 @@ public class TaxCalculatorService {
         return isJuly || isWeekend || isHoliday;
     }
 
-    @Transactional
-    public boolean updatingTax(int currentTax, VehicleEntity vehicle, LocalDateTime currentTimeDate) {
+    public TaxEntity getLatestTax(String vehicleNumber) {
+        List<TaxEntity> taxList = taxRepository.findByVehicleNumberOrderByUpdatedAtDesc(vehicleNumber);
+
+        if(taxList.isEmpty()) {
+            return null;
+        }
+
+        return taxList.getFirst();
+    }
+
+    public boolean updatingTax(int currentTax, LocalDateTime currentTimeDate, String vehicleNumber) {
         try {
-            TaxEntity tax = TaxEntity.builder().totalTaxOwe(currentTax).taxLimit(60).transactionDate(currentTimeDate).updatedAt(currentTimeDate).build();
-            TaxEntity savedTax = taxRepository.save(tax);
-            VehicleEntity currentVehicle = vehicleRepository.findByVehicleNumber(vehicle.getVehicleNumber())
-                    .orElseThrow(() -> new EntityNotFoundException("Vehicle not found"));
-            currentVehicle.getTaxList().add(savedTax);
-            vehicleRepository.save(currentVehicle);
+            TaxEntity tax = TaxEntity.builder()
+                    .totalTaxOwe(currentTax)
+                    .taxLimit(60)
+                    .vehicleNumber(vehicleNumber)
+                    .updatedAt(currentTimeDate)
+                    .build();
+
+            taxRepository.save(tax);
             return true;
-        } catch (EntityNotFoundException e) {
+        } catch (DataIntegrityViolationException e) {
+            log.error("Constraint Error while updating tax: {}", e.getMessage());
+            return false;
+        } catch(MongoWriteException e) {
+            log.error("MongoDB write error while updating tax: {}", e.getMessage());
             return false;
         } catch (Exception e) {
             log.error("Error updating tax: {}", e.getMessage());
@@ -72,54 +75,45 @@ public class TaxCalculatorService {
         }
     }
 
-    public int calculateTaxForSameDay(TaxEntity lastRecentTax, int currentHourTax, LocalDateTime currentTime, VehicleEntity vehicle) {
+    public int calculateTaxForSameDay(TaxEntity lastRecentTax, int currentHourTax, LocalDateTime currentTime) {
         int totalAmountDueForToday = lastRecentTax.getTotalTaxOwe();
 
-        // If the daily tax limit is already reached, return the limit
         if (totalAmountDueForToday >= lastRecentTax.getTaxLimit()) {
             return lastRecentTax.getTaxLimit();
         }
 
-        // If last tax update was within the past hour
         if (lastRecentTax.getUpdatedAt().isAfter(currentTime.minusHours(1))) {
-            // Update with the higher tax if current tax is greater
-            return handleTaxUpdateForSameHour(lastRecentTax, currentHourTax, vehicle);
+            return handleTaxUpdateForSameHour(lastRecentTax, currentHourTax);
         } else if (lastRecentTax.getUpdatedAt().toLocalDate().equals(currentTime.toLocalDate())) {
-            // If it's the same day but a different hour, add the tax up to the limit for the day
-            return handleTaxUpdateForDifferentHour(lastRecentTax, currentHourTax, vehicle, currentTime);
+            return handleTaxUpdateForDifferentHour(lastRecentTax, currentHourTax, currentTime);
         } else {
-            // If it's a new day, create a new tax entry
-            return handleTaxUpdateForNewDay(currentHourTax, vehicle, currentTime);
+            return handleTaxUpdateForNewDay(currentHourTax, currentTime, lastRecentTax.getVehicleNumber());
         }
     }
 
-    private int handleTaxUpdateForSameHour(TaxEntity lastRecentTax, int currentHourTax, VehicleEntity vehicle) {
-        // If currentHourTax is greater than the recorded tax for the last hour, replace it
+    private int handleTaxUpdateForSameHour(TaxEntity lastRecentTax, int currentHourTax) {
         if (currentHourTax > lastRecentTax.getTotalTaxOwe()) {
-            lastRecentTax.setTotalTaxOwe(currentHourTax);
-            taxRepository.save(lastRecentTax);
+            savingTax(lastRecentTax, currentHourTax);
             log.info("Updated tax for the same hour with a higher value: {}", currentHourTax);
         }
         return lastRecentTax.getTotalTaxOwe();
     }
 
-    private int handleTaxUpdateForDifferentHour(TaxEntity lastRecentTax, int currentHourTax, VehicleEntity vehicle, LocalDateTime currentTime) {
+    private int handleTaxUpdateForDifferentHour(TaxEntity lastRecentTax, int currentHourTax, LocalDateTime currentTime) {
         int newTotal = lastRecentTax.getTotalTaxOwe() + currentHourTax;
 
-        // If adding the current tax exceeds the daily limit, cap it at the limit
         if (newTotal > lastRecentTax.getTaxLimit()) {
             newTotal = lastRecentTax.getTaxLimit();
         }
 
-        lastRecentTax.setTotalTaxOwe(newTotal);
         lastRecentTax.setUpdatedAt(currentTime);
-        taxRepository.save(lastRecentTax);
+        savingTax(lastRecentTax,newTotal);
         log.info("Added tax for a different hour on the same day: {}", currentHourTax);
         return newTotal;
     }
 
-    private int handleTaxUpdateForNewDay(int currentHourTax, VehicleEntity vehicle, LocalDateTime currentTime) {
-        boolean success = updatingTax(currentHourTax, vehicle, currentTime);
+    private int handleTaxUpdateForNewDay(int currentHourTax, LocalDateTime currentTime, String vehicleNumber) {
+        boolean success = updatingTax(currentHourTax, currentTime, vehicleNumber);
         if (!success) {
             log.warn("Failed to create new tax entry for a new day.");
             return -1;  // Indicate failure with a specific value
@@ -127,4 +121,10 @@ public class TaxCalculatorService {
         log.info("Created new tax entry for a new day: {}", currentHourTax);
         return currentHourTax;
     }
+
+    private void savingTax(TaxEntity taxToUpdate, int amount) {
+        taxToUpdate.setTotalTaxOwe(amount);
+        taxRepository.save(taxToUpdate);
+    }
+
 }

@@ -1,10 +1,8 @@
 package com.volvo.tax_calculator.utils;
-
 import com.google.common.collect.ImmutableRangeMap;
 import com.google.common.collect.Range;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
@@ -29,6 +27,7 @@ public class CongestionTaxCalculator {
                 .put(Range.closedOpen(createTime(0, 0), createTime(6, 0)), 0) // midnight to 6:00 AM
                 .build();
     }
+
     private LocalTime createTime(int hour, int minute) {
         return LocalTime.of(hour, minute);
     }
@@ -41,7 +40,7 @@ public class CongestionTaxCalculator {
         //if had int, not possible to compare with != null, that is why used Integer wrapper class
         Integer taxAmount = taxBrackets.get(LocalTime.from(dateTime));
 
-        if(taxAmount != null) {
+        if (taxAmount != null) {
             return taxAmount;
         }
 

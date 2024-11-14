@@ -1,24 +1,18 @@
 package com.volvo.tax_calculator.controller;
-
 import com.volvo.tax_calculator.dto.ResponseDto;
 import com.volvo.tax_calculator.entities.TaxEntity;
 import com.volvo.tax_calculator.entities.VehicleEntity;
-import com.volvo.tax_calculator.repository.TaxRepository;
+import com.volvo.tax_calculator.exceptions.TaxCalculationException;
+import com.volvo.tax_calculator.exceptions.VehicleDataMissingException;
 import com.volvo.tax_calculator.service.TaxCalculatorService;
-import com.volvo.tax_calculator.service.VehicleService;
 import com.volvo.tax_calculator.utils.CongestionTaxCalculator;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-
-import java.util.List;
-
 import static com.volvo.tax_calculator.constants.ExemptVehicleType.isExempted;
 
 @Slf4j
@@ -29,7 +23,6 @@ public class TaxCalculate {
 
     private final TaxCalculatorService taxCalculatorService;
     private final CongestionTaxCalculator congestionTaxCalculator;
-    private final VehicleService vehicleService;
 
     @GetMapping("/health")
     public String healthCheck() {
@@ -39,21 +32,27 @@ public class TaxCalculate {
     @PostMapping
     public ResponseEntity<ResponseDto<Integer>> taxCalculation(@RequestBody VehicleEntity vehicle) {
         try {
+            // Validate required fields
+            if (vehicle.vehicleType() == null || vehicle.vehicleType().isEmpty() ||
+                    vehicle.vehicleNumber() == null || vehicle.vehicleNumber().isEmpty()) {
+                throw new VehicleDataMissingException("Vehicle type or number is missing.");
+            }
             ResponseDto<Integer> response = calculateTaxForVehicle(vehicle);
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR, "Error calculating tax", null));
+        } catch (VehicleDataMissingException | TaxCalculationException ex ) {
+            throw ex;
+        } catch(Exception ex) {
+            log.error("Unexpected error during tax calculation", ex);
+            throw new TaxCalculationException("Error calculating tax");
         }
     }
 
     public ResponseDto<Integer> calculateTaxForVehicle(VehicleEntity vehicle) {
         if (vehicle == null) {
-            log.error("Vehicle entity is null");
-            return new ResponseDto<>(HttpStatus.BAD_REQUEST, "Vehicle data is missing", 0);
+            throw new VehicleDataMissingException("Vehicle data is missing");
         }
-        String vehicleType = vehicle.getVehicleType();
 
-        if (isExempted(vehicleType)) {
+        if (isExempted(vehicle.vehicleType())) {
             return new ResponseDto<>(HttpStatus.OK, "Vehicle is exempted from tax", 0);
         }
 
@@ -61,44 +60,40 @@ public class TaxCalculate {
             return new ResponseDto<>(HttpStatus.OK, "Currently in Non-taxable period", 0);
         }
 
-        VehicleEntity currentVehicle = vehicleService.getVehicleInfo(vehicle.getVehicleNumber(), vehicle.getVehicleType());
         int currentHourTax = congestionTaxCalculator.calculateTax(LocalDateTime.now());
 
-        if (currentVehicle.getTaxList().isEmpty()) {
-            boolean isTaxUpdated = taxCalculatorService.updatingTax(currentHourTax, vehicle, LocalDateTime.now());
-            if (isTaxUpdated) {
-                return new ResponseDto<>(HttpStatus.OK, "Initial tax entry created", currentHourTax);
-            } else {
-                return new ResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to create tax entry", null);
-            }
-        } else {
-            // Handle tax update based on previous tax entry
-            return calculateOrUpdateTaxForExistingRecord(currentVehicle, currentHourTax);
-
+        TaxEntity lastRecentTax = taxCalculatorService.getLatestTax(vehicle.vehicleNumber());
+        LocalDateTime currentTime = LocalDateTime.now();
+        if(lastRecentTax != null) {
+            return calculateOrUpdateTaxForExistingRecord(lastRecentTax, currentHourTax, currentTime, vehicle.vehicleNumber());
         }
+
+        return creatingNewTax(currentHourTax, currentTime, vehicle.vehicleNumber());
+
     }
 
-    private ResponseDto<Integer> calculateOrUpdateTaxForExistingRecord(VehicleEntity currentVehicle, int currentHourTax) {
-        List<TaxEntity> taxList = currentVehicle.getTaxList();
-        TaxEntity lastRecentTax = taxList.getLast();
-        LocalDateTime currentTime = LocalDateTime.now();
+    private ResponseDto<Integer> calculateOrUpdateTaxForExistingRecord(TaxEntity lastRecentTax, int currentHourTax, LocalDateTime currentTime, String vehicleNumber) {
 
-        //Checking if the last tax charged was day before
         if (lastRecentTax.getUpdatedAt().toLocalDate().isBefore(LocalDate.now())) {
-            boolean isTaxUpdated = taxCalculatorService.updatingTax(currentHourTax, currentVehicle, currentTime);
-            return isTaxUpdated
-                    ? new ResponseDto<>(HttpStatus.OK, "New day tax entry created", currentHourTax)
-                    : new ResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to create new tax entry", null);
+           return creatingNewTax(currentHourTax, currentTime, vehicleNumber);
         }
 
-        // Calculate tax for the same day
-        int updatedTax = taxCalculatorService.calculateTaxForSameDay(lastRecentTax, currentHourTax, currentTime, currentVehicle);
+        int updatedTax = taxCalculatorService.calculateTaxForSameDay(lastRecentTax, currentHourTax, currentTime);
         if (updatedTax == -1) {
-            return new ResponseDto<>(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to update tax for the same day", null);
+            throw new TaxCalculationException("Failed to update tax for the same day");
         }
 
         return new ResponseDto<>(HttpStatus.OK, "Tax updated for the same day", updatedTax);
     }
+
+    private ResponseDto<Integer> creatingNewTax(int currentHourTax, LocalDateTime currentTime, String vehicleNumber) {
+        boolean isTaxUpdated = taxCalculatorService.updatingTax(currentHourTax, currentTime, vehicleNumber);
+        if (!isTaxUpdated) {
+            throw new TaxCalculationException("Failed to create new tax entry");
+        }
+        return new ResponseDto<>(HttpStatus.OK, "New day tax entry created", currentHourTax);
+    }
+
 }
 
 
