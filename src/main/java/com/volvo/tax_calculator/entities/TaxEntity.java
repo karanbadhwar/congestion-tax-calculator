@@ -1,11 +1,10 @@
 package com.volvo.tax_calculator.entities;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.bson.types.ObjectId;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -23,8 +22,14 @@ public class TaxEntity {
     @Builder.Default
     private int taxLimit = 60;
 
+    @CreatedDate
     private LocalDateTime createdAt;
 
+    @LastModifiedDate
     private LocalDateTime updatedAt;
-    private LocalDateTime transactionDate;
+
+    @NonNull
+    private String vehicleNumber;
+
+
 }
